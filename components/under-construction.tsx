@@ -1,26 +1,42 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { motion } from "framer-motion";
 
 import { Github, Linkedin } from "./icons";
+import posthog from "posthog-js";
 
-const Word = ({ children }: { children: string }) => {
+const Word = ({
+  text,
+  onHoveredTextEvent,
+}: {
+  text: string;
+  onHoveredTextEvent: (text: string) => void;
+}) => {
   const [hovered, setHovered] = useState(false);
 
-  if (children === "Soon") {
+  const handleMouseEnter = useCallback(() => {
+    setHovered(true);
+    onHoveredTextEvent(text);
+  }, [text, onHoveredTextEvent]);
+
+  const handleMouseLeave = useCallback(() => {
+    setHovered(false);
+  }, []);
+
+  if (text === "Soon") {
     return (
       <span
         className="relative inline-block cursor-default"
-        onMouseEnter={() => setHovered(true)}
-        onMouseLeave={() => setHovered(false)}
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
       >
         <motion.span
           className="relative z-10 inline-block"
           animate={hovered ? { x: 2, y: -2 } : { x: 0, y: 0 }}
           transition={{ duration: 0.15, ease: "easeOut" }}
         >
-          {children}
+          {text}
         </motion.span>
         <motion.span
           className="absolute left-0 top-0 text-yellow-600 select-none"
@@ -30,16 +46,20 @@ const Word = ({ children }: { children: string }) => {
           }
           transition={{ duration: 0.15, ease: "easeOut" }}
         >
-          {children}
+          {text}
         </motion.span>
       </span>
     );
   }
 
-  return <span className="px-1">{children}</span>;
+  return <span className="px-1">{text}</span>;
 };
 
 export function UnderConstruction() {
+  const onHoveredTextEvent = (text: string) => {
+    posthog.capture("hovered_text", { text });
+  };
+
   useEffect(() => {
     const stars = document.querySelectorAll(".star");
     stars.forEach((star) => {
@@ -73,7 +93,8 @@ export function UnderConstruction() {
           James Zhang
         </h1>
         <p className="text-2xl font-bold mb-8 animate-fade-in-up">
-          Coming <Word>Soon</Word> ...
+          Coming <Word text="Soon" onHoveredTextEvent={onHoveredTextEvent} />{" "}
+          ...
         </p>
         <div className="flex justify-center space-x-6 animate-fade-in-up">
           <motion.a
