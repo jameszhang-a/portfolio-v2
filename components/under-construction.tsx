@@ -57,7 +57,15 @@ const Word = ({
 
 export function UnderConstruction() {
   const onHoveredTextEvent = (text: string) => {
-    posthog.capture("hovered_text", { text });
+    posthog.capture("text_hover", { text });
+  };
+
+  const onHoveredIconEvent = (icon: string) => {
+    posthog.capture("icon_hover", { icon });
+  };
+
+  const onClickedIconEvent = (icon: string) => {
+    posthog.capture("icon_click", { icon });
   };
 
   useEffect(() => {
@@ -103,6 +111,8 @@ export function UnderConstruction() {
             rel="noopener noreferrer"
             className="text-gray-400 hover:text-gray-200 transition-colors duration-300"
             whileHover={{ scale: 1.2 }}
+            onMouseEnter={() => onHoveredIconEvent("github")}
+            onClick={() => onClickedIconEvent("github")}
           >
             <Github className="w-8 h-8" />
             <span className="sr-only">GitHub</span>
@@ -113,6 +123,8 @@ export function UnderConstruction() {
             rel="noopener noreferrer"
             className="text-gray-400 hover:text-gray-200 transition-colors duration-300"
             whileHover={{ scale: 1.2 }}
+            onMouseEnter={() => onHoveredIconEvent("linkedin")}
+            onClick={() => onClickedIconEvent("linkedin")}
           >
             <Linkedin className="w-8 h-8" />
             <span className="sr-only">LinkedIn</span>
