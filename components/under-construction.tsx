@@ -1,10 +1,16 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { motion } from "framer-motion";
 
 import { Github, Linkedin } from "./icons";
 import posthog from "posthog-js";
+
+/** Seeded pseudo-random number generator for deterministic values */
+function seededRandom(seed: number): number {
+  const x = Math.sin(seed * 9999) * 10000;
+  return x - Math.floor(x);
+}
 
 export function UnderConstruction() {
   const onHoveredIconEvent = (icon: string) => {
@@ -15,14 +21,26 @@ export function UnderConstruction() {
     posthog.capture("icon_click", { icon });
   };
 
+  // Pre-compute star positions with deterministic values (rounded to avoid hydration mismatch)
+  const stars = useMemo(
+    () =>
+      [...Array(100)].map((_, i) => ({
+        left: Math.round(seededRandom(i * 4) * 10000) / 100,
+        top: Math.round(seededRandom(i * 4 + 1) * 10000) / 100,
+        width: Math.round((seededRandom(i * 4 + 2) * 2 + 1) * 100) / 100,
+        height: Math.round((seededRandom(i * 4 + 3) * 2 + 1) * 100) / 100,
+      })),
+    []
+  );
+
   useEffect(() => {
-    const stars = document.querySelectorAll(".star");
-    stars.forEach((star) => {
+    const starElements = document.querySelectorAll(".star");
+    starElements.forEach((star, i) => {
       star.animate([{ opacity: 0 }, { opacity: 1 }, { opacity: 0 }], {
         duration: 3000,
         easing: "ease-in-out",
         iterations: Infinity,
-        delay: Math.random() * 3000,
+        delay: seededRandom(i * 5) * 3000,
       });
     });
   }, []);
@@ -30,15 +48,15 @@ export function UnderConstruction() {
   return (
     <div className="relative flex flex-col items-center justify-center min-h-screen p-4 overflow-hidden bg-gray-900 text-gray-300">
       <div className="absolute inset-0">
-        {[...Array(100)].map((_, i) => (
+        {stars.map((star, i) => (
           <div
             key={i}
             className="star absolute rounded-full bg-gray-500"
             style={{
-              left: `${Math.random() * 100}%`,
-              top: `${Math.random() * 100}%`,
-              width: `${Math.random() * 2 + 1}px`,
-              height: `${Math.random() * 2 + 1}px`,
+              left: `${star.left}%`,
+              top: `${star.top}%`,
+              width: `${star.width}px`,
+              height: `${star.height}px`,
             }}
           />
         ))}
