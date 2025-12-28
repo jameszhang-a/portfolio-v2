@@ -3,6 +3,9 @@ import localFont from "next/font/local";
 import "./globals.css";
 
 import { CSPostHogProvider } from "./providers";
+import { ThemeProvider } from "@/providers/theme-provider";
+import { ToastProvider } from "@/providers/Toasts/ToastProvider";
+import { ToastContainer } from "@/providers/Toasts/ToastContainer";
 
 const geistSans = localFont({
   src: "./fonts/GeistVF.woff",
@@ -26,13 +29,23 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <CSPostHogProvider>
-        <body
-          className={`${geistSans.variable} ${geistMono.variable} antialiased bg-zinc-900`}
-        >
-          {children}
-        </body>
+        <ToastProvider>
+          <body
+            className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+          >
+            <ThemeProvider
+              attribute="class"
+              defaultTheme="dark"
+              enableSystem
+              disableTransitionOnChange
+            >
+              {children}
+              <ToastContainer />
+            </ThemeProvider>
+          </body>
+        </ToastProvider>
       </CSPostHogProvider>
     </html>
   );
