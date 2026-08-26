@@ -3,12 +3,12 @@
 import { useEffect, useRef } from "react";
 
 const STAR_COUNT = 96;
-const INFLUENCE_RADIUS = 150;
-const MAX_OFFSET = 20;
-const PULL = 0.16;
-const SWIRL = 0.14;
-const STIFFNESS = 16;
-const DAMPING = 8.5;
+const INFLUENCE_RADIUS = 170;
+const MAX_OFFSET = 28;
+const KEEP_AWAY = 10;
+const SWIRL = 0.22;
+const STIFFNESS = 18;
+const DAMPING = 9;
 const MAX_DPR = 2;
 
 type Star = {
@@ -81,8 +81,8 @@ function starTarget(star: Star, pointer: Pointer) {
   }
 
   const t = 1 - dist / INFLUENCE_RADIUS;
-  const falloff = t * t;
-  const offset = Math.min(MAX_OFFSET, dist * PULL) * falloff;
+  const falloff = t * t * (3 - 2 * t);
+  const offset = Math.min(MAX_OFFSET * falloff, Math.max(0, dist - KEEP_AWAY));
   const inv = 1 / dist;
   const swirl = offset * SWIRL * star.swirl;
 
@@ -101,7 +101,7 @@ function drawStars(
   for (const star of stars) {
     const twinkle = reducedMotion
       ? 1
-      : 0.72 + 0.28 * Math.sin(time * star.twinkleSpeed + star.phase);
+      : 0.9 + 0.1 * Math.sin(time * star.twinkleSpeed + star.phase);
     const alpha = star.baseAlpha * twinkle;
     const g = Math.round(star.gray);
 
