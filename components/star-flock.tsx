@@ -3,12 +3,12 @@
 import { useEffect, useRef } from "react";
 
 const STAR_COUNT = 96;
-const INFLUENCE_RADIUS = 170;
-const MAX_OFFSET = 28;
-const KEEP_AWAY = 10;
-const SWIRL = 0.22;
-const STIFFNESS = 18;
-const DAMPING = 9;
+const INFLUENCE_RADIUS = 180;
+const MAX_OFFSET = 42;
+const KEEP_AWAY = 12;
+const SWIRL = 0.16;
+const STIFFNESS = 16;
+const DAMPING = 8.5;
 const MAX_DPR = 2;
 
 type Star = {
@@ -55,16 +55,30 @@ function createStars(width: number, height: number, rng: () => number): Star[] {
       y,
       vx: 0,
       vy: 0,
-      size: rng() * 1.6 + 0.7,
+      size: rng() * 1.8 + 0.9,
       phase: rng() * Math.PI * 2,
       twinkleSpeed: 0.35 + rng() * 0.55,
-      baseAlpha: 0.32 + rng() * 0.28,
+      baseAlpha: 0.4 + rng() * 0.28,
       swirl: rng() < 0.5 ? -1 : 1,
       gray: 108 + rng() * 42,
     });
   }
 
   return stars;
+}
+
+function starInfluence(star: Star, pointer: Pointer) {
+  if (!pointer.active) {
+    return 0;
+  }
+
+  const dist = Math.hypot(pointer.x - star.homeX, pointer.y - star.homeY);
+  if (dist > INFLUENCE_RADIUS) {
+    return 0;
+  }
+
+  const t = 1 - dist / INFLUENCE_RADIUS;
+  return t * t * (3 - 2 * t);
 }
 
 function starTarget(star: Star, pointer: Pointer) {
@@ -80,8 +94,7 @@ function starTarget(star: Star, pointer: Pointer) {
     return { x: star.homeX, y: star.homeY };
   }
 
-  const t = 1 - dist / INFLUENCE_RADIUS;
-  const falloff = t * t * (3 - 2 * t);
+  const falloff = starInfluence(star, pointer);
   const offset = Math.min(MAX_OFFSET * falloff, Math.max(0, dist - KEEP_AWAY));
   const inv = 1 / dist;
   const swirl = offset * SWIRL * star.swirl;
@@ -97,17 +110,20 @@ function drawStars(
   stars: Star[],
   time: number,
   reducedMotion: boolean,
+  pointer: Pointer,
 ) {
   for (const star of stars) {
     const twinkle = reducedMotion
       ? 1
       : 0.9 + 0.1 * Math.sin(time * star.twinkleSpeed + star.phase);
-    const alpha = star.baseAlpha * twinkle;
-    const g = Math.round(star.gray);
+    const inf = reducedMotion ? 0 : starInfluence(star, pointer);
+    const alpha = Math.min(0.95, star.baseAlpha * twinkle * (1 + 0.7 * inf));
+    const size = star.size * (1 + 0.25 * inf);
+    const g = Math.round(star.gray + inf * 28);
 
-    ctx.fillStyle = `rgba(${g}, ${g + 4}, ${g + 8}, ${alpha})`;
+    ctx.fillStyle = `rgba(${g}, ${g + 4}, ${Math.min(255, g + 10)}, ${alpha})`;
     ctx.beginPath();
-    ctx.arc(star.x, star.y, star.size, 0, Math.PI * 2);
+    ctx.arc(star.x, star.y, size, 0, Math.PI * 2);
     ctx.fill();
   }
 }
@@ -172,7 +188,7 @@ export function StarFlock() {
 
       if (reducedMotion) {
         ctx.clearRect(0, 0, width, height);
-        drawStars(ctx, stars, 0, true);
+        drawStars(ctx, stars, 0, true, pointer);
       }
     };
 
@@ -197,7 +213,7 @@ export function StarFlock() {
         }
 
         ctx.clearRect(0, 0, width, height);
-        drawStars(ctx, stars, time, false);
+        drawStars(ctx, stars, time, false, pointer);
       }
 
       raf = window.requestAnimationFrame(step);
@@ -230,7 +246,7 @@ export function StarFlock() {
           star.vy = 0;
         }
         ctx.clearRect(0, 0, width, height);
-        drawStars(ctx, stars, 0, true);
+        drawStars(ctx, stars, 0, true, pointer);
       }
     };
 
