@@ -134,10 +134,12 @@ function drawStars(
  */
 export function StarFlock() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const hostRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const canvas = canvasRef.current;
-    if (!canvas) {
+    const host = hostRef.current;
+    if (!canvas || !host) {
       return;
     }
 
@@ -159,20 +161,21 @@ export function StarFlock() {
     let running = true;
 
     const resize = () => {
-      const nextWidth = canvas.clientWidth;
-      const nextHeight = canvas.clientHeight;
-      if (nextWidth === 0 || nextHeight === 0) {
+      const rect = host.getBoundingClientRect();
+      const nextWidth = rect.width;
+      const nextHeight = rect.height;
+      if (nextWidth < 2 || nextHeight < 2) {
         return;
       }
 
       const dpr = Math.min(window.devicePixelRatio || 1, MAX_DPR);
-      canvas.width = Math.floor(nextWidth * dpr);
-      canvas.height = Math.floor(nextHeight * dpr);
+      canvas.width = Math.max(1, Math.floor(nextWidth * dpr));
+      canvas.height = Math.max(1, Math.floor(nextHeight * dpr));
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
       if (stars.length === 0) {
         stars = createStars(nextWidth, nextHeight, rng);
-      } else {
+      } else if (width > 0 && height > 0) {
         const scaleX = nextWidth / width;
         const scaleY = nextHeight / height;
         for (const star of stars) {
@@ -220,7 +223,7 @@ export function StarFlock() {
     };
 
     const onPointerMove = (event: PointerEvent) => {
-      const rect = canvas.getBoundingClientRect();
+      const rect = host.getBoundingClientRect();
       pointer.x = event.clientX - rect.left;
       pointer.y = event.clientY - rect.top;
       pointer.active = true;
@@ -254,8 +257,9 @@ export function StarFlock() {
     raf = window.requestAnimationFrame(step);
 
     const observer = new ResizeObserver(resize);
-    observer.observe(canvas);
+    observer.observe(host);
     media.addEventListener("change", onMotionChange);
+    window.addEventListener("resize", resize);
     window.addEventListener("pointermove", onPointerMove, { passive: true });
     window.addEventListener("pointerdown", onPointerMove, { passive: true });
     window.addEventListener("pointerup", onPointerUp, { passive: true });
@@ -268,6 +272,7 @@ export function StarFlock() {
       window.cancelAnimationFrame(raf);
       observer.disconnect();
       media.removeEventListener("change", onMotionChange);
+      window.removeEventListener("resize", resize);
       window.removeEventListener("pointermove", onPointerMove);
       window.removeEventListener("pointerdown", onPointerMove);
       window.removeEventListener("pointerup", onPointerUp);
@@ -278,10 +283,8 @@ export function StarFlock() {
   }, []);
 
   return (
-    <canvas
-      ref={canvasRef}
-      className="pointer-events-none absolute inset-0 h-full w-full"
-      aria-hidden
-    />
+    <div ref={hostRef} className="pointer-events-none absolute inset-0">
+      <canvas ref={canvasRef} className="block h-full w-full" aria-hidden />
+    </div>
   );
 }
