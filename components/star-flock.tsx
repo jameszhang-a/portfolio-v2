@@ -162,8 +162,12 @@ export function StarFlock() {
 
     const resize = () => {
       const rect = host.getBoundingClientRect();
-      const nextWidth = rect.width;
-      const nextHeight = rect.height;
+      let nextWidth = rect.width;
+      let nextHeight = rect.height;
+      if (nextWidth < 64 || nextHeight < 64) {
+        nextWidth = window.innerWidth;
+        nextHeight = window.innerHeight;
+      }
       if (nextWidth < 2 || nextHeight < 2) {
         return;
       }
