@@ -1,0 +1,271 @@
+"use client";
+
+import { useEffect, useRef } from "react";
+
+const STAR_COUNT = 96;
+const INFLUENCE_RADIUS = 150;
+const MAX_OFFSET = 20;
+const PULL = 0.16;
+const SWIRL = 0.14;
+const STIFFNESS = 16;
+const DAMPING = 8.5;
+const MAX_DPR = 2;
+
+type Star = {
+  homeX: number;
+  homeY: number;
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  size: number;
+  phase: number;
+  twinkleSpeed: number;
+  baseAlpha: number;
+  swirl: number;
+  gray: number;
+};
+
+type Pointer = {
+  x: number;
+  y: number;
+  active: boolean;
+};
+
+function mulberry32(seed: number) {
+  let t = seed >>> 0;
+  return () => {
+    t += 0x6d2b79f5;
+    let r = Math.imul(t ^ (t >>> 15), 1 | t);
+    r ^= r + Math.imul(r ^ (r >>> 7), 61 | r);
+    return ((r ^ (r >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function createStars(width: number, height: number, rng: () => number): Star[] {
+  const stars: Star[] = [];
+
+  for (let i = 0; i < STAR_COUNT; i += 1) {
+    const x = rng() * width;
+    const y = rng() * height;
+    stars.push({
+      homeX: x,
+      homeY: y,
+      x,
+      y,
+      vx: 0,
+      vy: 0,
+      size: rng() * 1.6 + 0.7,
+      phase: rng() * Math.PI * 2,
+      twinkleSpeed: 0.35 + rng() * 0.55,
+      baseAlpha: 0.32 + rng() * 0.28,
+      swirl: rng() < 0.5 ? -1 : 1,
+      gray: 108 + rng() * 42,
+    });
+  }
+
+  return stars;
+}
+
+function starTarget(star: Star, pointer: Pointer) {
+  if (!pointer.active) {
+    return { x: star.homeX, y: star.homeY };
+  }
+
+  const dx = pointer.x - star.homeX;
+  const dy = pointer.y - star.homeY;
+  const dist = Math.hypot(dx, dy);
+
+  if (dist > INFLUENCE_RADIUS || dist < 0.0001) {
+    return { x: star.homeX, y: star.homeY };
+  }
+
+  const t = 1 - dist / INFLUENCE_RADIUS;
+  const falloff = t * t;
+  const offset = Math.min(MAX_OFFSET, dist * PULL) * falloff;
+  const inv = 1 / dist;
+  const swirl = offset * SWIRL * star.swirl;
+
+  return {
+    x: star.homeX + dx * inv * offset - dy * inv * swirl,
+    y: star.homeY + dy * inv * offset + dx * inv * swirl,
+  };
+}
+
+function drawStars(
+  ctx: CanvasRenderingContext2D,
+  stars: Star[],
+  time: number,
+  reducedMotion: boolean,
+) {
+  for (const star of stars) {
+    const twinkle = reducedMotion
+      ? 1
+      : 0.72 + 0.28 * Math.sin(time * star.twinkleSpeed + star.phase);
+    const alpha = star.baseAlpha * twinkle;
+    const g = Math.round(star.gray);
+
+    ctx.fillStyle = `rgba(${g}, ${g + 4}, ${g + 8}, ${alpha})`;
+    ctx.beginPath();
+    ctx.arc(star.x, star.y, star.size, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
+/**
+ * Quiet 2D star field for the home background.
+ * Nearby stars drift toward the cursor, then ease back to their homes.
+ */
+export function StarFlock() {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) {
+      return;
+    }
+
+    const ctx = canvas.getContext("2d", { alpha: true });
+    if (!ctx) {
+      return;
+    }
+
+    const rng = mulberry32(0x5f1d);
+    const pointer: Pointer = { x: 0, y: 0, active: false };
+    const media = window.matchMedia("(prefers-reduced-motion: reduce)");
+
+    let stars: Star[] = [];
+    let width = 0;
+    let height = 0;
+    let reducedMotion = media.matches;
+    let raf = 0;
+    let lastTime = performance.now();
+    let running = true;
+
+    const resize = () => {
+      const nextWidth = canvas.clientWidth;
+      const nextHeight = canvas.clientHeight;
+      if (nextWidth === 0 || nextHeight === 0) {
+        return;
+      }
+
+      const dpr = Math.min(window.devicePixelRatio || 1, MAX_DPR);
+      canvas.width = Math.floor(nextWidth * dpr);
+      canvas.height = Math.floor(nextHeight * dpr);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+      if (stars.length === 0) {
+        stars = createStars(nextWidth, nextHeight, rng);
+      } else {
+        const scaleX = nextWidth / width;
+        const scaleY = nextHeight / height;
+        for (const star of stars) {
+          star.homeX *= scaleX;
+          star.homeY *= scaleY;
+          star.x *= scaleX;
+          star.y *= scaleY;
+        }
+      }
+
+      width = nextWidth;
+      height = nextHeight;
+
+      if (reducedMotion) {
+        ctx.clearRect(0, 0, width, height);
+        drawStars(ctx, stars, 0, true);
+      }
+    };
+
+    const step = (now: number) => {
+      if (!running) {
+        return;
+      }
+
+      const dt = Math.min(0.033, (now - lastTime) / 1000);
+      lastTime = now;
+      const time = now / 1000;
+
+      if (!reducedMotion && document.visibilityState === "visible") {
+        for (const star of stars) {
+          const target = starTarget(star, pointer);
+          const ax = (target.x - star.x) * STIFFNESS - star.vx * DAMPING;
+          const ay = (target.y - star.y) * STIFFNESS - star.vy * DAMPING;
+          star.vx += ax * dt;
+          star.vy += ay * dt;
+          star.x += star.vx * dt;
+          star.y += star.vy * dt;
+        }
+
+        ctx.clearRect(0, 0, width, height);
+        drawStars(ctx, stars, time, false);
+      }
+
+      raf = window.requestAnimationFrame(step);
+    };
+
+    const onPointerMove = (event: PointerEvent) => {
+      const rect = canvas.getBoundingClientRect();
+      pointer.x = event.clientX - rect.left;
+      pointer.y = event.clientY - rect.top;
+      pointer.active = true;
+    };
+
+    const onPointerLeave = () => {
+      pointer.active = false;
+    };
+
+    const onPointerUp = (event: PointerEvent) => {
+      if (event.pointerType !== "mouse") {
+        pointer.active = false;
+      }
+    };
+
+    const onMotionChange = () => {
+      reducedMotion = media.matches;
+      if (reducedMotion) {
+        for (const star of stars) {
+          star.x = star.homeX;
+          star.y = star.homeY;
+          star.vx = 0;
+          star.vy = 0;
+        }
+        ctx.clearRect(0, 0, width, height);
+        drawStars(ctx, stars, 0, true);
+      }
+    };
+
+    resize();
+    raf = window.requestAnimationFrame(step);
+
+    const observer = new ResizeObserver(resize);
+    observer.observe(canvas);
+    media.addEventListener("change", onMotionChange);
+    window.addEventListener("pointermove", onPointerMove, { passive: true });
+    window.addEventListener("pointerdown", onPointerMove, { passive: true });
+    window.addEventListener("pointerup", onPointerUp, { passive: true });
+    window.addEventListener("pointercancel", onPointerLeave);
+    window.addEventListener("blur", onPointerLeave);
+    document.addEventListener("mouseleave", onPointerLeave);
+
+    return () => {
+      running = false;
+      window.cancelAnimationFrame(raf);
+      observer.disconnect();
+      media.removeEventListener("change", onMotionChange);
+      window.removeEventListener("pointermove", onPointerMove);
+      window.removeEventListener("pointerdown", onPointerMove);
+      window.removeEventListener("pointerup", onPointerUp);
+      window.removeEventListener("pointercancel", onPointerLeave);
+      window.removeEventListener("blur", onPointerLeave);
+      document.removeEventListener("mouseleave", onPointerLeave);
+    };
+  }, []);
+
+  return (
+    <canvas
+      ref={canvasRef}
+      className="pointer-events-none absolute inset-0 h-full w-full"
+      aria-hidden
+    />
+  );
+}

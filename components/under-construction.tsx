@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect } from "react";
 import { motion } from "framer-motion";
+import posthog from "posthog-js";
 
 import { Github, Linkedin } from "./icons";
-import posthog from "posthog-js";
+import { StarFlock } from "./star-flock";
 
 export function UnderConstruction() {
   const onHoveredIconEvent = (icon: string) => {
@@ -15,34 +15,9 @@ export function UnderConstruction() {
     posthog.capture("icon_click", { icon });
   };
 
-  useEffect(() => {
-    const stars = document.querySelectorAll(".star");
-    stars.forEach((star) => {
-      star.animate([{ opacity: 0 }, { opacity: 1 }, { opacity: 0 }], {
-        duration: 3000,
-        easing: "ease-in-out",
-        iterations: Infinity,
-        delay: Math.random() * 3000,
-      });
-    });
-  }, []);
-
   return (
     <div className="relative flex flex-col items-center justify-center min-h-screen p-4 overflow-hidden bg-gray-900 text-gray-300">
-      <div className="absolute inset-0">
-        {[...Array(100)].map((_, i) => (
-          <div
-            key={i}
-            className="star absolute rounded-full bg-gray-500"
-            style={{
-              left: `${Math.random() * 100}%`,
-              top: `${Math.random() * 100}%`,
-              width: `${Math.random() * 2 + 1}px`,
-              height: `${Math.random() * 2 + 1}px`,
-            }}
-          />
-        ))}
-      </div>
+      <StarFlock />
       <main className="z-10 text-center">
         <div className="flex justify-center space-x-6 animate-fade-in-up">
           <motion.a
